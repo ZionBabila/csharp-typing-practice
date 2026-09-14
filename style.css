@@ -430,13 +430,6 @@ body {
     white-space: nowrap;
 }
 
-/* Shown while the lesson is locked waiting for a mistake to be corrected. */
-.hint.hint-error {
-    color: var(--base);
-    background: var(--red);
-    font-weight: 600;
-}
-
 /* ── Completion Overlay ───────────────────────────────────────────── */
 .completion {
     position: absolute;

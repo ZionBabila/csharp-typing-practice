@@ -9,7 +9,7 @@ const state = {
     correctChars: 0,
     startTime: null,
     timerInterval: null,
-    hasError: false,
+    wrongAt: new Set(), // positions typed wrong, so Backspace can undo them
     isStarted: false,
     isComplete: false,
     elapsedSeconds: 0,
@@ -169,7 +169,7 @@ function loadLesson(idx) {
     state.errors          = 0;
     state.correctChars    = 0;
     state.startTime       = null;
-    state.hasError        = false;
+    state.wrongAt.clear();
     state.isStarted       = false;
     state.isComplete      = false;
     state.elapsedSeconds  = 0;
@@ -183,7 +183,6 @@ function loadLesson(idx) {
     completionEl.classList.remove('visible');
     hintEl.style.display = 'block';
     hintEl.textContent   = 'לחץ על מקש כלשהו להתחלה';
-    hintEl.classList.remove('hint-error');
 
     const lesson = LESSONS[idx];
     currentCode  = lesson.code;
@@ -287,14 +286,6 @@ function handleKeyDown(e) {
 }
 
 function handleChar(typed) {
-    // After a mistake the lesson is locked until it is corrected. Backspace
-    // clears it, and so does simply typing the right character — locking the
-    // keyboard on the one key the typist is trying to find reads as a freeze.
-    if (state.hasError) {
-        if (typed !== currentCode[state.currentPosition]) return;
-        clearError();
-    }
-
     if (!state.isStarted) {
         state.isStarted = true;
         state.startTime = Date.now();
@@ -302,69 +293,56 @@ function handleChar(typed) {
         startTimer();
     }
 
-    const expected = currentCode[state.currentPosition];
+    const pos      = state.currentPosition;
+    const expected = currentCode[pos];
+    const isRight  = typed === expected;
 
-    if (typed === expected) {
-        // ✓ Correct keystroke
-        setSpanClass(state.currentPosition, 'correct');
+    if (isRight) {
+        setSpanClass(pos, 'correct');
         state.correctChars++;
-        state.currentPosition++;
-
-        if (state.currentPosition < currentCode.length) {
-            setSpanClass(state.currentPosition, 'current');
-        }
-
-        // Scroll so new current character stays at the target row
-        scrollToCurrent(true);
-        updateStats();
-
-        if (state.currentPosition >= currentCode.length) {
-            completeLesson();
-        }
     } else {
-        // ✗ Wrong keystroke — lock until corrected, and say so on screen
+        // Mistakes do not stop the lesson: mark the character red and move on,
+        // the way a real editor lets you type past a typo. wrongAt remembers
+        // the position so Backspace can undo it and stats stay honest.
         state.errors++;
-        state.hasError = true;
-        charSpans[state.currentPosition].classList.add('char-wrong');
-        showError();
-        updateStats(); // reflect the hit to accuracy now, not on the next correct key
-        // Brief shake animation for feedback
-        charSpans[state.currentPosition].classList.add('shake');
-        setTimeout(() => {
-            charSpans[state.currentPosition]?.classList.remove('shake');
-        }, 280);
+        state.wrongAt.add(pos);
+        setSpanClass(pos, 'wrong');
+        charSpans[pos].classList.add('shake');
+        setTimeout(() => charSpans[pos]?.classList.remove('shake'), 280);
     }
-}
 
-// Tell the typist the lesson is waiting on a correction, rather than letting
-// it look frozen. The hint doubles as the pre-start prompt, so restore that.
-function showError() {
-    hintEl.textContent   = '✗ טעות — הקלד את התו הנכון, או Backspace';
-    hintEl.classList.add('hint-error');
-    hintEl.style.display = 'block';
-}
+    state.currentPosition++;
 
-function clearError() {
-    state.hasError = false;
-    charSpans[state.currentPosition]?.classList.remove('char-wrong');
-    hintEl.classList.remove('hint-error');
-    hintEl.style.display = 'none';
+    if (state.currentPosition < currentCode.length) {
+        setSpanClass(state.currentPosition, 'current');
+    }
+
+    // Scroll so new current character stays at the target row
+    scrollToCurrent(true);
+    updateStats();
+
+    if (state.currentPosition >= currentCode.length) {
+        completeLesson();
+    }
 }
 
 function handleBackspace() {
-    if (state.hasError) {
-        clearError();
-        return;
+    if (state.currentPosition === 0) return;
+
+    setSpanClass(state.currentPosition, 'pending');
+    state.currentPosition--;
+
+    // Undo whichever kind of keystroke produced this character.
+    if (state.wrongAt.has(state.currentPosition)) {
+        state.wrongAt.delete(state.currentPosition);
+        state.errors = Math.max(0, state.errors - 1);
+    } else {
+        state.correctChars = Math.max(0, state.correctChars - 1);
     }
 
-    if (state.currentPosition > 0) {
-        setSpanClass(state.currentPosition, 'pending');
-        state.currentPosition--;
-        state.correctChars = Math.max(0, state.correctChars - 1);
-        setSpanClass(state.currentPosition, 'current');
-        scrollToCurrent(true); // scroll back too
-        updateStats();
-    }
+    setSpanClass(state.currentPosition, 'current');
+    scrollToCurrent(true); // scroll back too
+    updateStats();
 }
 
 // Efficiently update a single span's CSS class
