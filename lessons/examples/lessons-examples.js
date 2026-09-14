@@ -484,7 +484,7 @@ public class CameraShake : MonoBehaviour
 
     {
         id: 19,
-        category: "דוגמה מעשי\u05ET",
+        category: "דוגמה מעשית",
         title: "Orbit Object — Transform Math",
         description: "HOW TO TEST: Empty center + Sphere → Add this to Sphere → Drag center into orbitTarget.",
         difficulty: 2,
