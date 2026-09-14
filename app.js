@@ -183,6 +183,7 @@ function loadLesson(idx) {
     completionEl.classList.remove('visible');
     hintEl.style.display = 'block';
     hintEl.textContent   = 'לחץ על מקש כלשהו להתחלה';
+    hintEl.classList.remove('hint-error');
 
     const lesson = LESSONS[idx];
     currentCode  = lesson.code;
@@ -286,7 +287,13 @@ function handleKeyDown(e) {
 }
 
 function handleChar(typed) {
-    if (state.hasError) return; // must press Backspace to clear error first
+    // After a mistake the lesson is locked until it is corrected. Backspace
+    // clears it, and so does simply typing the right character — locking the
+    // keyboard on the one key the typist is trying to find reads as a freeze.
+    if (state.hasError) {
+        if (typed !== currentCode[state.currentPosition]) return;
+        clearError();
+    }
 
     if (!state.isStarted) {
         state.isStarted = true;
@@ -315,10 +322,12 @@ function handleChar(typed) {
             completeLesson();
         }
     } else {
-        // ✗ Wrong keystroke — mark error, force Backspace to continue
+        // ✗ Wrong keystroke — lock until corrected, and say so on screen
         state.errors++;
         state.hasError = true;
         charSpans[state.currentPosition].classList.add('char-wrong');
+        showError();
+        updateStats(); // reflect the hit to accuracy now, not on the next correct key
         // Brief shake animation for feedback
         charSpans[state.currentPosition].classList.add('shake');
         setTimeout(() => {
@@ -327,11 +336,24 @@ function handleChar(typed) {
     }
 }
 
+// Tell the typist the lesson is waiting on a correction, rather than letting
+// it look frozen. The hint doubles as the pre-start prompt, so restore that.
+function showError() {
+    hintEl.textContent   = '✗ טעות — הקלד את התו הנכון, או Backspace';
+    hintEl.classList.add('hint-error');
+    hintEl.style.display = 'block';
+}
+
+function clearError() {
+    state.hasError = false;
+    charSpans[state.currentPosition]?.classList.remove('char-wrong');
+    hintEl.classList.remove('hint-error');
+    hintEl.style.display = 'none';
+}
+
 function handleBackspace() {
     if (state.hasError) {
-        // Clear the error state — user can retry
-        state.hasError = false;
-        charSpans[state.currentPosition].classList.remove('char-wrong');
+        clearError();
         return;
     }
 
