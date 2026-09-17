@@ -7,4 +7,5 @@ const LESSONS = [
     ...LESSONS_API,
     ...LESSONS_SHELL_BOUND,
     ...LESSONS_EXAMPLES,
+    ...LESSONS_PLAYER_DETECT,
 ];
